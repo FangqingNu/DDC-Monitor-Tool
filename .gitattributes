@@ -1,0 +1,12 @@
+* text=auto
+
+*.cs      text
+*.csproj  text
+*.md      text
+*.json    text
+*.manifest text
+*.py      text
+
+*.ico     binary
+*.png     binary
+*.exe     binary

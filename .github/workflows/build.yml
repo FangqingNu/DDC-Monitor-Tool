@@ -1,0 +1,56 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      # 日常构建：依赖 .NET 6 桌面运行时，体积小
+      - name: Publish (framework-dependent)
+        run: dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o out/fx
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DdcMonitorTool-fx-win-x64
+          path: out/fx/DdcMonitorTool.exe
+          if-no-files-found: error
+
+      # 打 tag 时额外出一个自带运行时的版本，方便没装 .NET 的人直接用
+      - name: Publish (self-contained)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: >
+          dotnet publish -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -o out/sc
+
+      - name: Rename release assets
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          Move-Item out/fx/DdcMonitorTool.exe out/DdcMonitorTool-fx-win-x64.exe
+          Move-Item out/sc/DdcMonitorTool.exe out/DdcMonitorTool-standalone-win-x64.exe
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            out/DdcMonitorTool-fx-win-x64.exe
+            out/DdcMonitorTool-standalone-win-x64.exe
+          generate_release_notes: true
